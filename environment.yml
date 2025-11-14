@@ -1,0 +1,5 @@
+name: c-zlib-demo
+channels:
+  - conda-forge
+dependencies:
+  - zlib=1.2.8

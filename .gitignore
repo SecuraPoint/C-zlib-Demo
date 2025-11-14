@@ -1,0 +1,4 @@
+.miniforge
+main
+*.o
+*.out
