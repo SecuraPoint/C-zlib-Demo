@@ -1,0 +1,9 @@
+# Ignore the Nix development shell definition
+default.nix
+
+# Ignore Conda installation directory
+.miniforge/
+
+# Ignore build artifacts
+main
+*.o
