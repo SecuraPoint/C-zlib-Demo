@@ -52,6 +52,13 @@ pkgs.mkShell {
 
       echo "🔧 Activating project conda environment…"
       conda activate "$ENV_NAME"
+
+      echo "🔧 Installing conda-lock inside Conda environment…"
+      conda install -y -c conda-forge conda-lock
+
+      echo "✅ conda-lock is ready. Example:"
+      echo "   conda-lock -f environment.yml -p linux-64 -p osx-64"
+
     else
       echo "⚠️ Miniforge installation seems to have failed."
       echo "   Try: rm -rf .miniforge && nix-shell"
