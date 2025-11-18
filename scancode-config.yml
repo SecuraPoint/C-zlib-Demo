@@ -2,11 +2,11 @@ policies:
 product_name:
 product_version:
 ignored_patterns:
-  - 'environment.yml'
-  - 'main'
+  - '*/environment.yml'
+  - '*/main'
   - '*.o'
   - '.miniforge/*'
-  - 'default.nix'
+  - '*/default.nix'
 scan_max_file_size:
 attribution_template:
 ignored_vulnerabilities:
