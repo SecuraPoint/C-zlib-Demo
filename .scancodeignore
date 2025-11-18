@@ -7,3 +7,6 @@ default.nix
 # Ignore build artifacts
 main
 *.o
+
+# Ignore environment.yml; conda-lock.yml should be scanned installed
+environment.yml
