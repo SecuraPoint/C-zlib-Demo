@@ -1,162 +1,322 @@
 name: ScanCode.io SBOM Scan
 
 on:
-  push:
-    tags:
-      - "v*.*.*"   # Trigger only on semantic versioning tags like v1.2.3
+    push:
+        tags:
+            - "v*.*.*" # Trigger only on semantic versioning tags like v1.2.3
 
 jobs:
-  scancodeio-scan:
-    runs-on: ubuntu-latest
+    scancodeio-scan:
+        runs-on: ubuntu-latest
 
-    env:
-      # Base URL of your ScanCode.io instance, e.g. "https://scancode.example.com"
-      SCANCODEIO_URL: ${{ secrets.SCANCODEIO_URL }}
-      SCANCODEIO_API_KEY: ${{ secrets.SCANCODEIO_API_KEY }}
-      DEJACODE_URL: ${{ secrets.DEJACODE_URL }}
-      DEJACODE_API_KEY: ${{ secrets.DEJACODE_API_KEY }}
+        env:
+            # Base URL of your ScanCode.io instance, e.g. "https://scancode.example.com"
+            SCANCODEIO_URL: ${{ secrets.SCANCODEIO_URL }}
+            SCANCODEIO_API_KEY: ${{ secrets.SCANCODEIO_API_KEY }}
+            DEJACODE_URL: ${{ secrets.DEJACODE_URL }}
+            DEJACODE_API_KEY: ${{ secrets.DEJACODE_API_KEY }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        outputs:
+            scancode_project_uuid: ${{ steps.create_project.outputs.project_uuid }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Install dependencies (conda-lock, PyYAML, jq)
-        run: |
-          python -m pip install --upgrade pip
-          pip install conda-lock pyyaml
-          sudo apt-get update
-          sudo apt-get install -y jq zip
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
 
-      - name: Regenerate conda-lock.yml from environment.yml
-        continue-on-error: true
-        run: |
-          set -e
-          echo "🔒 Regenerating conda-lock.yml from environment.yml..."
-          conda-lock -f environment.yml -p linux-64 -p osx-64
+            - name: Install dependencies (conda-lock, PyYAML, jq)
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install conda-lock pyyaml
+                  sudo apt-get update
+                  sudo apt-get install -y jq zip
 
-      - name: Check if conda-lock.yml differs (warning only)
-        continue-on-error: true
-        run: |
-          set +e
-          echo "🔍 Checking conda-lock.yml diff..."
-          if ! git diff --quiet -- conda-lock.yml; then
-            echo "::warning ::conda-lock.yml is NOT up-to-date with environment.yml."
-            echo "Below is the diff for your information:"
-            git --no-pager diff --minimal --color=always conda-lock.yml || true
-          else
-            echo "✅ conda-lock.yml is up-to-date."
-          fi
+            - name: Regenerate conda-lock.yml from environment.yml
+              continue-on-error: true
+              run: |
+                  set -e
+                  echo "🔒 Regenerating conda-lock.yml from environment.yml..."
+                  conda-lock -f environment.yml -p linux-64 -p osx-64
 
+            - name: Check if conda-lock.yml differs (warning only)
+              continue-on-error: true
+              run: |
+                  set +e
+                  echo "🔍 Checking conda-lock.yml diff..."
+                  if ! git diff --quiet -- conda-lock.yml; then
+                    echo "::warning ::conda-lock.yml is NOT up-to-date with environment.yml."
+                    echo "Below is the diff for your information:"
+                    git --no-pager diff --minimal --color=always conda-lock.yml || true
+                  else
+                    echo "✅ conda-lock.yml is up-to-date."
+                  fi
 
-      - name: Generate ABOUT files from conda-lock.yml
-        run: |
-          set -e
-          echo "📄 Generating ABOUT files from conda-lock.yml..."
-          # Assumes your script is committed as conda_lock_to_about.py in repo root
-          python conda_lock_to_about.py conda-lock.yml about/
+            - name: Generate ABOUT files from conda-lock.yml
+              run: |
+                  set -e
+                  echo "📄 Generating ABOUT files from conda-lock.yml..."
+                  # Assumes your script is committed as conda_lock_to_about.py in repo root
+                  python conda_lock_to_about.py conda-lock.yml about/
 
-      - name: Create codebase archive (including ABOUT files)
-        run: |
-          set -e
-          echo "📦 Creating codebase.zip (including about/ and config)..."
-          # Exclude Git internals and CI config from the archive
-          zip -r codebase.zip . \
-            -x ".git/*" ".github/*"
+            - name: Create codebase archive (including ABOUT files)
+              run: |
+                  set -e
+                  echo "📦 Creating codebase.zip (including about/ and config)..."
+                  # Exclude Git internals and CI config from the archive
+                  zip -r codebase.zip . \
+                    -x ".git/*" ".github/*"
 
-      - name: Create ScanCode.io project via REST API
-        id: create_project
-        run: |
-          set -e
+            - name: Create ScanCode.io project via REST API
+              id: create_project
+              run: |
+                  set -e
 
-          if [ -z "$SCANCODEIO_URL" ] || [ -z "$SCANCODEIO_API_KEY" ]; then
-            echo "❌ SCANCODEIO_URL or SCANCODEIO_API_KEY not set."
-            exit 1
-          fi
+                  if [ -z "$SCANCODEIO_URL" ] || [ -z "$SCANCODEIO_API_KEY" ]; then
+                    echo "❌ SCANCODEIO_URL or SCANCODEIO_API_KEY not set."
+                    exit 1
+                  fi
 
-          # Project name: <repo>-<tag>, e.g. C-zlib-Demo-v1.2.3
-          TAG_NAME="${GITHUB_REF_NAME}"
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
-          PROJECT_NAME="${REPO_NAME}-${TAG_NAME}"
+                  # Project name: <repo>-<tag>, e.g. C-zlib-Demo-v1.2.3
+                  TAG_NAME="${GITHUB_REF_NAME}"
+                  REPO_NAME="${GITHUB_REPOSITORY#*/}"
+                  PROJECT_NAME="${REPO_NAME}-${TAG_NAME}"
 
-          echo "📡 Creating ScanCode.io project: ${PROJECT_NAME}"
+                  echo "📡 Creating ScanCode.io project: ${PROJECT_NAME}"
 
-          API_URL="${SCANCODEIO_URL%/}/api/projects/"
+                  API_URL="${SCANCODEIO_URL%/}/api/projects/"
 
-          # Create project with the codebase archive as initial input
-          RESPONSE=$(curl -sS -X POST \
-            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
-            -F "name=${PROJECT_NAME}" \
-            -F "upload_file=@codebase.zip" \
-            "${API_URL}")
+                  # Create project with the codebase archive as initial input
+                  RESPONSE=$(curl -sS -X POST \
+                    -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+                    -F "name=${PROJECT_NAME}" \
+                    -F "upload_file=@codebase.zip" \
+                    "${API_URL}")
 
-          echo "API response: $RESPONSE"
+                  echo "API response: $RESPONSE"
 
-          PROJECT_URL=$(echo "$RESPONSE" | jq -r '.url')
-          PROJECT_UUID=$(echo "$RESPONSE" | jq -r '.uuid')
+                  PROJECT_URL=$(echo "$RESPONSE" | jq -r '.url')
+                  PROJECT_UUID=$(echo "$RESPONSE" | jq -r '.uuid')
 
-          if [ "$PROJECT_URL" = "null" ] || [ -z "$PROJECT_URL" ]; then
-            echo "❌ Failed to create project on ScanCode.io."
-            exit 1
-          fi
+                  if [ "$PROJECT_URL" = "null" ] || [ -z "$PROJECT_URL" ]; then
+                    echo "❌ Failed to create project on ScanCode.io."
+                    exit 1
+                  fi
 
-          echo "✅ Project created: $PROJECT_URL (UUID: $PROJECT_UUID)"
+                  echo "✅ Project created: $PROJECT_URL (UUID: $PROJECT_UUID)"
 
-          # Export values for later steps
-          echo "project_url=${PROJECT_URL}" >> "$GITHUB_OUTPUT"
-          echo "project_uuid=${PROJECT_UUID}" >> "$GITHUB_OUTPUT"
+                  # Export values for later steps
+                  echo "project_url=${PROJECT_URL}" >> "$GITHUB_OUTPUT"
+                  echo "project_uuid=${PROJECT_UUID}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload scancode-config.yml as second input
-        if: success()
-        run: |
-          set -e
+            - name: Upload scancode-config.yml as second input
+              if: success()
+              run: |
+                  set -e
 
-          PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
-          if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
-            echo "❌ Missing project UUID from previous step."
-            exit 1
-          fi
+                  PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
+                  if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
+                    echo "❌ Missing project UUID from previous step."
+                    exit 1
+                  fi
 
-          if [ ! -f "scancode-config.yml" ]; then
-            echo "⚠️ scancode-config.yml not found in repo root. Skipping config upload."
-            exit 0
-          fi
+                  if [ ! -f "scancode-config.yml" ]; then
+                    echo "⚠️ scancode-config.yml not found in repo root. Skipping config upload."
+                    exit 0
+                  fi
 
-          ADD_INPUT_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_input/"
+                  ADD_INPUT_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_input/"
 
-          echo "📡 Uploading scancode-config.yml as project input..."
-          RESPONSE=$(curl -sS -X POST \
-            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
-            -F "upload_file=@scancode-config.yml" \
-            -F "upload_file_tag=scancode-config" \
-            "${ADD_INPUT_URL}")
+                  echo "📡 Uploading scancode-config.yml as project input..."
+                  RESPONSE=$(curl -sS -X POST \
+                    -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+                    -F "upload_file=@scancode-config.yml" \
+                    -F "upload_file_tag=scancode-config" \
+                    "${ADD_INPUT_URL}")
 
-          echo "Add input response: $RESPONSE"
-          echo "✅ scancode-config.yml uploaded."
+                  echo "Add input response: $RESPONSE"
+                  echo "✅ scancode-config.yml uploaded."
 
-      - name: Add and start scan_codebase pipeline
-        if: success()
-        run: |
-          set -e
+            - name: Add and start scan_codebase pipeline
+              if: success()
+              run: |
+                  set -e
 
-          PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
-          if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
-            echo "❌ Missing project UUID from previous step."
-            exit 1
-          fi
+                  PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
+                  if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
+                    echo "❌ Missing project UUID from previous step."
+                    exit 1
+                  fi
 
-          ADD_PIPELINE_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_pipeline/"
+                  ADD_PIPELINE_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_pipeline/"
 
-          echo "🚀 Starting 'scan_codebase' pipeline..."
-          RESPONSE=$(curl -sS -X POST \
-            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{"pipeline": "scan_codebase", "execute_now": true}' \
-            "${ADD_PIPELINE_URL}")
+                  echo "🚀 Starting 'scan_codebase' pipeline..."
+                  RESPONSE=$(curl -sS -X POST \
+                    -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"pipeline": "scan_codebase", "execute_now": true}' \
+                    "${ADD_PIPELINE_URL}")
 
-          echo "Add pipeline response: $RESPONSE"
-          echo "✅ scan_codebase pipeline added and started."
+                  echo "Add pipeline response: $RESPONSE"
+                  echo "✅ scan_codebase pipeline added and started."
+
+    wait-and-import-to-dejacode:
+        name: Wait for ScanCode.io & import into DejaCode
+        needs: scancodeio-scan
+        runs-on: ubuntu-latest
+        env:
+            SCANCODEIO_URL: ${{ secrets.SCANCODEIO_URL }}
+            SCANCODEIO_API_KEY: ${{ secrets.SCANCODEIO_API_KEY }}
+            DEJACODE_URL: ${{ secrets.DEJACODE_URL }}
+            DEJACODE_API_KEY: ${{ secrets.DEJACODE_API_KEY }}
+            PROJECT_UUID: ${{ needs.scancodeio-scan.outputs.scancode_project_uuid }}
+            # Optional: GitHub-Variable SCANCODE_POLL_INTERVAL_SECONDS, sonst Default 5
+            POLL_INTERVAL_SECONDS: ${{ vars.SCANCODE_POLL_INTERVAL_SECONDS }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Wait for ScanCode.io pipeline to finish
+              run: |
+                  set -euo pipefail
+
+                  : "${PROJECT_UUID:?PROJECT_UUID is required}"
+
+                  POLL_INTERVAL="${POLL_INTERVAL_SECONDS:-5}"
+                  echo "Using poll interval: ${POLL_INTERVAL}s"
+
+                  SCANCODE_API_BASE="${SCANCODEIO_URL%/}/api"
+
+                  while true; do
+                    echo "Polling ScanCode.io project ${PROJECT_UUID}…"
+                    project_json=$(curl -sS -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+                      "${SCANCODE_API_BASE}/projects/${PROJECT_UUID}/")
+
+                    # Versuche, das erste Run-Objekt bzw. die Run-URL zu bekommen
+                    # Je nach ScanCode.io-Version kann .runs eine Liste von Objekten oder URLs sein.
+                    run_url=$(echo "$project_json" | jq -r '
+                      if (.runs | length) > 0 then
+                        # Falls Liste von Objekten:
+                        ( .runs[0].url // .runs[0] )
+                      else
+                        empty
+                      end
+                    ')
+
+                    if [ -z "${run_url:-}" ]; then
+                      echo "Keine Runs für dieses Projekt gefunden, warte ${POLL_INTERVAL}s…"
+                      sleep "$POLL_INTERVAL"
+                      continue
+                    fi
+
+                    # Relative URL in absolute URL umwandeln
+                    if [[ "$run_url" != http* ]]; then
+                      run_url="${SCANCODEIO_URL%/}${run_url}"
+                    fi
+
+                    echo "Checking run at: $run_url"
+
+                    run_json=$(curl -sS -H "Authorization: Token ${SCANCODEIO_API_KEY}" "$run_url")
+                    status=$(echo "$run_json" | jq -r '.status')
+
+                    echo "Current ScanCode.io run status: $status"
+
+                    case "$status" in
+                      success)
+                        echo "ScanCode.io run completed successfully."
+                        break
+                        ;;
+                      failure|stopped|error)
+                        echo "::error ::ScanCode.io pipeline failed with status '$status'"
+                        exit 1
+                        ;;
+                      queued|running|not_started|null|"")
+                        echo "Scan still in progress, waiting ${POLL_INTERVAL}s…"
+                        sleep "$POLL_INTERVAL"
+                        ;;
+                      *)
+                        echo "Unknown status '$status', waiting ${POLL_INTERVAL}s…"
+                        sleep "$POLL_INTERVAL"
+                        ;;
+                    esac
+                  done
+
+            - name: Download ScanCode.io results.json
+              run: |
+                  set -euo pipefail
+
+                  SCANCODE_API_BASE="${SCANCODEIO_URL%/}/api"
+
+                  echo "Downloading ScanCode.io JSON results for project ${PROJECT_UUID}…"
+
+                  curl -sS -L -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+                    "${SCANCODE_API_BASE}/projects/${PROJECT_UUID}/results_download/?output_format=json" \
+                    -o results.json
+
+                  ls -lh results.json
+
+            - name: Create/Update DejaCode Product and import ScanCode results
+              run: |
+                  set -euo pipefail
+
+                  # Produktname aus Repo, Version aus Tag ableiten
+                  PRODUCT_NAME="${GITHUB_REPOSITORY##*/}"
+                  RAW_TAG="${GITHUB_REF_NAME}"
+                  # z.B. v1.2.3 -> 1.2.3
+                  PRODUCT_VERSION="${RAW_TAG#v}"
+
+                  echo "Using DejaCode product: ${PRODUCT_NAME} ${PRODUCT_VERSION}"
+
+                  DEJACODE_API_BASE="${DEJACODE_URL%/}/api/v2"
+
+                  # Produkt anlegen (oder – falls schon vorhanden – später suchen)
+                  product_payload=$(jq -n \
+                    --arg name "$PRODUCT_NAME" \
+                    --arg version "$PRODUCT_VERSION" \
+                    '{name: $name, version: $version}')
+
+                  echo "Creating DejaCode product (may already exist)…"
+                  product_response=$(curl -sS -w "\n%{http_code}" \
+                    -H "Authorization: Token ${DEJACODE_API_KEY}" \
+                    -H "Content-Type: application/json" \
+                    -d "$product_payload" \
+                    "${DEJACODE_API_BASE}/products/")
+
+                  http_body=$(echo "$product_response" | head -n -1)
+                  http_code=$(echo "$product_response" | tail -n 1)
+
+                  if [ "$http_code" = "201" ]; then
+                    echo "DejaCode product created."
+                    PRODUCT_UUID=$(echo "$http_body" | jq -r '.uuid')
+                  else
+                    echo "Product create returned HTTP $http_code, trying to look up existing product…"
+
+                    PRODUCT_UUID=$(curl -sS \
+                      -H "Authorization: Token ${DEJACODE_API_KEY}" \
+                      "${DEJACODE_API_BASE}/products/?name=${PRODUCT_NAME}&version=${PRODUCT_VERSION}" \
+                      | jq -r '.results[0].uuid')
+
+                    if [ -z "$PRODUCT_UUID" ] || [ "$PRODUCT_UUID" = "null" ]; then
+                      echo "::error ::Could not determine DejaCode product UUID"
+                      echo "Create response body was:"
+                      echo "$http_body"
+                      exit 1
+                    fi
+                  fi
+
+                  echo "Using DejaCode product UUID: $PRODUCT_UUID"
+
+                  echo "Uploading ScanCode results.json to DejaCode product via import_from_scan…"
+                  # Entspricht der offiziellen DejaCode-Doku:
+                  # POST /api/v2/products/<UUID>/import_from_scan/ mit upload_file=results.json usw. 
+                  curl -sS \
+                    -H "Authorization: Token ${DEJACODE_API_KEY}" \
+                    -F "upload_file=@results.json" \
+                    -F "create_codebase_resources=true" \
+                    -F "stop_on_error=true" \
+                    "${DEJACODE_API_BASE}/products/${PRODUCT_UUID}/import_from_scan/"
+
+                  echo "DejaCode import_from_scan triggered."
