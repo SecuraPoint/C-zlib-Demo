@@ -1,0 +1,159 @@
+name: ScanCode.io SBOM Scan
+
+on:
+  push:
+    tags:
+      - "v*.*.*"   # Trigger only on semantic versioning tags like v1.2.3
+
+jobs:
+  scancodeio-scan:
+    runs-on: ubuntu-latest
+
+    env:
+      # Base URL of your ScanCode.io instance, e.g. "https://scancode.example.com"
+      SCANCODEIO_URL: ${{ secrets.SCANCODEIO_URL }}
+      SCANCODEIO_API_KEY: ${{ secrets.SCANCODEIO_API_KEY }}
+      DEJACODE_URL: ${{ secrets.DEJACODE_URL }}
+      DEJACODE_API_KEY: ${{ secrets.DEJACODE_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies (conda-lock, PyYAML, jq)
+        run: |
+          python -m pip install --upgrade pip
+          pip install conda-lock pyyaml
+          sudo apt-get update
+          sudo apt-get install -y jq zip
+
+      - name: Regenerate conda-lock.yml from environment.yml
+        run: |
+          set -e
+          echo "🔒 Regenerating conda-lock.yml from environment.yml..."
+          conda-lock -f environment.yml -p linux-64 -p osx-64
+
+      - name: Verify conda-lock.yml is up-to-date
+        run: |
+          set -e
+          if ! git diff --quiet -- conda-lock.yml; then
+            echo "❌ conda-lock.yml is not up-to-date with environment.yml."
+            echo "   Please run 'conda-lock -f environment.yml -p linux-64 -p osx-64'"
+            echo "   locally and commit the updated conda-lock.yml."
+            git diff -- conda-lock.yml || true
+            exit 1
+          fi
+          echo "✅ conda-lock.yml is up-to-date."
+
+      - name: Generate ABOUT files from conda-lock.yml
+        run: |
+          set -e
+          echo "📄 Generating ABOUT files from conda-lock.yml..."
+          # Assumes your script is committed as conda_lock_to_about.py in repo root
+          python conda_lock_to_about.py conda-lock.yml about/
+
+      - name: Create codebase archive (including ABOUT files)
+        run: |
+          set -e
+          echo "📦 Creating codebase.zip (including about/ and config)..."
+          # Exclude Git internals and CI config from the archive
+          zip -r codebase.zip . \
+            -x ".git/*" ".github/*"
+
+      - name: Create ScanCode.io project via REST API
+        id: create_project
+        run: |
+          set -e
+
+          if [ -z "$SCANCODEIO_URL" ] || [ -z "$SCANCODEIO_API_KEY" ]; then
+            echo "❌ SCANCODEIO_URL or SCANCODEIO_API_KEY not set."
+            exit 1
+          fi
+
+          # Project name: <repo>-<tag>, e.g. C-zlib-Demo-v1.2.3
+          TAG_NAME="${GITHUB_REF_NAME}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          PROJECT_NAME="${REPO_NAME}-${TAG_NAME}"
+
+          echo "📡 Creating ScanCode.io project: ${PROJECT_NAME}"
+
+          API_URL="${SCANCODEIO_URL%/}/api/projects/"
+
+          # Create project with the codebase archive as initial input
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+            -F "name=${PROJECT_NAME}" \
+            -F "upload_file=@codebase.zip" \
+            "${API_URL}")
+
+          echo "API response: $RESPONSE"
+
+          PROJECT_URL=$(echo "$RESPONSE" | jq -r '.url')
+          PROJECT_UUID=$(echo "$RESPONSE" | jq -r '.uuid')
+
+          if [ "$PROJECT_URL" = "null" ] || [ -z "$PROJECT_URL" ]; then
+            echo "❌ Failed to create project on ScanCode.io."
+            exit 1
+          fi
+
+          echo "✅ Project created: $PROJECT_URL (UUID: $PROJECT_UUID)"
+
+          # Export values for later steps
+          echo "project_url=${PROJECT_URL}" >> "$GITHUB_OUTPUT"
+          echo "project_uuid=${PROJECT_UUID}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload scancode-config.yml as second input
+        if: success()
+        run: |
+          set -e
+
+          PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
+          if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
+            echo "❌ Missing project UUID from previous step."
+            exit 1
+          fi
+
+          if [ ! -f "scancode-config.yml" ]; then
+            echo "⚠️ scancode-config.yml not found in repo root. Skipping config upload."
+            exit 0
+          fi
+
+          ADD_INPUT_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_input/"
+
+          echo "📡 Uploading scancode-config.yml as project input..."
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+            -F "upload_file=@scancode-config.yml" \
+            -F "upload_file_tag=scancode-config" \
+            "${ADD_INPUT_URL}")
+
+          echo "Add input response: $RESPONSE"
+          echo "✅ scancode-config.yml uploaded."
+
+      - name: Add and start scan_codebase pipeline
+        if: success()
+        run: |
+          set -e
+
+          PROJECT_UUID="${{ steps.create_project.outputs.project_uuid }}"
+          if [ -z "$PROJECT_UUID" ] || [ "$PROJECT_UUID" = "null" ]; then
+            echo "❌ Missing project UUID from previous step."
+            exit 1
+          fi
+
+          ADD_PIPELINE_URL="${SCANCODEIO_URL%/}/api/projects/${PROJECT_UUID}/add_pipeline/"
+
+          echo "🚀 Starting 'scan_codebase' pipeline..."
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Token ${SCANCODEIO_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"pipeline": "scan_codebase", "execute_now": true}' \
+            "${ADD_PIPELINE_URL}")
+
+          echo "Add pipeline response: $RESPONSE"
+          echo "✅ scan_codebase pipeline added and started."

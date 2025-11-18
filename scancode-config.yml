@@ -7,6 +7,8 @@ ignored_patterns:
   - '*.o'
   - '.miniforge/*'
   - '*/default.nix'
+  - '*/conda_lock_to_about.py'
+  - '*.github/*'
 scan_max_file_size:
 attribution_template:
 ignored_vulnerabilities:
