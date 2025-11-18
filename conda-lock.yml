@@ -18,8 +18,8 @@ metadata:
     linux-64: eb728827ffa3fa4d8c6a670d93fbce4fe10cea00e21149b66098a0737d9fbbe6
     osx-64: d8dc6be5823e35b5b27746fa432e1b3f29fee2753afe2576d02d4a01635be156
   platforms:
-  - osx-64
   - linux-64
+  - osx-64
   sources:
   - /Users/marco/Projects/securapoint/c-zlib-demo/environment.yml
 package:
