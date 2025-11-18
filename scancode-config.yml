@@ -1,0 +1,13 @@
+policies:
+product_name:
+product_version:
+ignored_patterns:
+  - 'environment.yml'
+  - 'main'
+  - '*.o'
+  - '.miniforge/*'
+  - 'default.nix'
+scan_max_file_size:
+attribution_template:
+ignored_vulnerabilities:
+ignored_dependency_scopes:
