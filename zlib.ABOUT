@@ -1,6 +1,0 @@
-about_resource: .
-name: zlib
-version: 1.2.8
-download_url: https://conda.anaconda.org/conda-forge/linux-64/zlib-1.2.8-3.tar.bz2
-purl: pkg:conda/zlib@1.2.8?channel=conda-forge&subdir=linux-64&build=3&type=tar.bz2
-package_url: https://anaconda.org/conda-forge/zlib
