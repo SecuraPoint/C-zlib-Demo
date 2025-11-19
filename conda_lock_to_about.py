@@ -10,14 +10,16 @@ Requirements:
 
 Usage:
     python conda_lock_to_about.py
-    # optionally:
+    # or:
     python conda_lock_to_about.py path/to/conda-lock.yml out_dir
+    # or with explicit version for the codebase ABOUT:
+    python conda_lock_to_about.py path/to/conda-lock.yml out_dir 1.2.3
 """
 
 import sys
-import os
 from pathlib import Path
 import urllib.parse
+from typing import Optional
 
 import yaml
 
@@ -39,23 +41,21 @@ def parse_conda_url_to_purl(url: str) -> dict:
     filename = parts[-1]
 
     # Detect file extension (.tar.bz2 or .conda)
-    file_ext = None
-    base = filename
-    if base.endswith(".tar.bz2"):
+    if filename.endswith(".tar.bz2"):
         file_ext = "tar.bz2"
-        base_no_ext = base[: -len(".tar.bz2")]
-    elif base.endswith(".conda"):
+        base_no_ext = filename[:-len(".tar.bz2")]
+    elif filename.endswith(".conda"):
         file_ext = "conda"
-        base_no_ext = base[: -len(".conda")]
+        base_no_ext = filename[:-len(".conda")]
     else:
-        # Fallback: split at first dot
-        dot_idx = base.find(".")
+        # Fallback: split before first dot
+        dot_idx = filename.find(".")
         if dot_idx != -1:
-            file_ext = base[dot_idx + 1 :]
-            base_no_ext = base[:dot_idx]
+            file_ext = filename[dot_idx + 1:]
+            base_no_ext = filename[:dot_idx]
         else:
             file_ext = ""
-            base_no_ext = base
+            base_no_ext = filename
 
     # name-version-build
     tokens = base_no_ext.split("-")
@@ -71,17 +71,17 @@ def parse_conda_url_to_purl(url: str) -> dict:
         pkg_version = ""
         build = ""
 
-    purl = f"pkg:conda/{pkg_name}@{pkg_version}"
+    purl = "pkg:conda/{0}@{1}".format(pkg_name, pkg_version)
     qualifiers = []
 
     if channel:
-        qualifiers.append(f"channel={channel}")
+        qualifiers.append("channel={}".format(channel))
     if subdir:
-        qualifiers.append(f"subdir={subdir}")
+        qualifiers.append("subdir={}".format(subdir))
     if build:
-        qualifiers.append(f"build={build}")
+        qualifiers.append("build={}".format(build))
     if file_ext:
-        qualifiers.append(f"type={file_ext}")
+        qualifiers.append("type={}".format(file_ext))
 
     if qualifiers:
         purl = purl + "?" + "&".join(qualifiers)
@@ -107,13 +107,14 @@ def write_about_file(path: Path, fields: dict) -> None:
         if value is None:
             continue
         if "\n" in str(value):
-            lines.append(f"{key}: |")
+            lines.append("{}: |".format(key))
             for line in str(value).splitlines():
-                lines.append(f"  {line}")
+                lines.append("  {}".format(line))
         else:
-            lines.append(f"{key}: {value}")
+            lines.append("{}: {}".format(key, value))
+
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"✔ Created ABOUT file: {path}")
+    print("✔ Created ABOUT file:", path)
 
 
 def generate_package_about_files(lock_data: dict, out_dir: Path) -> None:
@@ -131,14 +132,22 @@ def generate_package_about_files(lock_data: dict, out_dir: Path) -> None:
         url = pkg.get("url")
 
         if not url:
-            print(f"⚠️  Package {name} ({platform}) has no URL – skipped.")
+            print("⚠️  Package {} ({}) has no URL – skipped.".format(name, platform))
             continue
 
         meta = parse_conda_url_to_purl(url)
 
+        display_name = meta["name"] or name
+        # Include platform in displayed package name
+        if platform:
+            name_with_platform = "{}-{}".format(display_name, platform)
+        else:
+            name_with_platform = display_name
+
         about_fields = {
             "about_resource": name,
-            "name": meta["name"] or name,
+            "name": name_with_platform,      # name including platform
+            "canonical_name": display_name,  # original name
             "version": meta["version"] or version,
             "platform": platform,
             "download_url": url,
@@ -149,20 +158,22 @@ def generate_package_about_files(lock_data: dict, out_dir: Path) -> None:
             "conda_build": meta["build"],
         }
 
-        filename = f"{name}-{platform}.ABOUT"
+        filename = "{}-{}.ABOUT".format(name, platform) if platform else "{}.ABOUT".format(name)
         out_path = out_dir / filename
         write_about_file(out_path, about_fields)
 
 
-def generate_codebase_about(out_dir: Path) -> None:
+def generate_codebase_about(out_dir: Path, version: Optional[str] = None) -> None:
     """
     Create an ABOUT file for the codebase itself.
-    This contains metadata for the C-zlib-Demo project.
+    If 'version' is provided, it is used as the codebase version.
     """
+    codebase_version = version or "0.1.0"
+
     about_fields = {
         "about_resource": ".",
         "name": "c-zlib-demo",
-        "version": "0.1.0",
+        "version": codebase_version,
         "download_url": "https://github.com/SecuraPoint/C-zlib-Demo/archive/refs/heads/main.zip",
         "vcs_url": "https://github.com/SecuraPoint/C-zlib-Demo.git",
         "summary": "Demo C project using zlib for SBOM/SCA and ScanCode.io experiments.",
@@ -176,14 +187,17 @@ def generate_codebase_about(out_dir: Path) -> None:
 def main():
     lock_path = Path("conda-lock.yml")
     out_dir = Path("about")
+    codebase_version = None
 
     if len(sys.argv) >= 2:
         lock_path = Path(sys.argv[1])
     if len(sys.argv) >= 3:
         out_dir = Path(sys.argv[2])
+    if len(sys.argv) >= 4:
+        codebase_version = sys.argv[3]
 
     if not lock_path.is_file():
-        print(f"❌ conda-lock file not found: {lock_path}")
+        print("❌ conda-lock file not found:", lock_path)
         sys.exit(1)
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +206,7 @@ def main():
         lock_data = yaml.safe_load(f)
 
     generate_package_about_files(lock_data, out_dir)
-    generate_codebase_about(out_dir)
+    generate_codebase_about(out_dir, version=codebase_version)
 
     print("🎉 Done. ABOUT files written to:", out_dir.resolve())
 
