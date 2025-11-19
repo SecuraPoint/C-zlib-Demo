@@ -58,9 +58,10 @@ jobs:
             - name: Generate ABOUT files from conda-lock.yml
               run: |
                   set -e
+                  TAG_VERSION="${GITHUB_REF_NAME#v}"
                   echo "📄 Generating ABOUT files from conda-lock.yml..."
                   # Assumes your script is committed as conda_lock_to_about.py in repo root
-                  python conda_lock_to_about.py conda-lock.yml about/
+                  python conda_lock_to_about.py conda-lock.yml about/ "$TAG_VERSION"
 
             - name: Create codebase archive (including ABOUT files)
               run: |
