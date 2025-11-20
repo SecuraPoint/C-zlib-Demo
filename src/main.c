@@ -25,29 +25,48 @@
 #include <stdio.h>
 #include <string.h>
 #include <zlib.h>
+#include <png.h>
 
-int main() {
+int main(void) {
     const char* text = "Hello from zlib via conda forge!";
     unsigned char compressed[100];
     unsigned char decompressed[100];
     uLong compressedSize = sizeof(compressed);
     uLong decompressedSize = sizeof(decompressed);
 
+    /* --- zlib Demo: simple compress / decompress --- */
+
     // Compress
-    if (compress(compressed, &compressedSize, (const Bytef*)text, strlen(text)) != Z_OK) {
+    if (compress(compressed, &compressedSize,
+                 (const Bytef*)text, strlen(text)) != Z_OK) {
         printf("Fehler bei compress()\n");
         return 1;
     }
 
     // Decompress
-    if (uncompress(decompressed, &decompressedSize, compressed, compressedSize) != Z_OK) {
+    if (uncompress(decompressed, &decompressedSize,
+                   compressed, compressedSize) != Z_OK) {
         printf("Fehler bei uncompress()\n");
         return 1;
     }
 
     decompressed[decompressedSize] = '\0'; // null terminator
 
-    printf("Original: %s\n", text);
+    printf("Original:     %s\n", text);
     printf("Dekomprimiert: %s\n", decompressed);
+
+    /* --- libpng Demo: show compile-time and runtime version --- */
+
+    printf("\nlibpng compile-time version: %s\n", PNG_LIBPNG_VER_STRING);
+
+    unsigned long png_runtime_ver = png_access_version_number();
+    printf("libpng runtime version (numeric): %lu\n", png_runtime_ver);
+
+    if (png_runtime_ver == 0) {
+        fprintf(stderr, "Fehler: libpng Runtime-Version konnte nicht ermittelt werden!\n");
+        return 1;
+    }
+
+    printf("zlib und libpng sind erfolgreich gelinkt und verwendbar.\n");
     return 0;
 }

@@ -2,4 +2,5 @@ name: c-zlib-demo
 channels:
   - conda-forge
 dependencies:
-  - zlib=1.2.8
+  - zlib=1.2.11
+  - libpng=1.6.34

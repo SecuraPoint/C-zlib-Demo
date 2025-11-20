@@ -1,6 +1,6 @@
 CC=cc
 CFLAGS=-I$(CONDA_PREFIX)/include
-LDFLAGS=-L$(CONDA_PREFIX)/lib -lz
+LDFLAGS=-L$(CONDA_PREFIX)/lib -lpng -lz
 
 all: main
 
