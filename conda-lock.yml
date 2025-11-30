@@ -13,8 +13,8 @@
 version: 1
 metadata:
   content_hash:
-    linux-64: 99b27b4bd71522e554621107ada5bfbde3c123d2579a30999e0934ccde54222a
-    osx-64: 7c4371ce1e5d35afffd7187b0a550e218338eb546e6952007c11de008d12ad7d
+    linux-64: 184fe5904e705ee1b394a07ca9c77805267947240bb55915e98987172e77d67c
+    osx-64: 8695282289ca951fd744994e5d0ee71dd61442d03d1baacaa3dfc1c3b8e14306
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -56,10 +56,10 @@ package:
   dependencies:
     __glibc: '>=2.17,<3.0.a0'
     _openmp_mutex: '>=4.5'
-  url: https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-h767d61c_7.conda
+  url: https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-he0feb66_14.conda
   hash:
-    md5: c0374badb3a5d4b1372db28d19462c53
-    sha256: 08f9b87578ab981c7713e4e6a7d935e40766e10691732bba376d4964562bcb45
+    md5: 550dceb769d23bcf0e2f97fd4062d720
+    sha256: 947bfbe5e47cd5d0cbdb0926d4baadb3e9be25caca7c6c6ef516f7ef85052cec
   category: main
   optional: false
 - name: libgcc-ng
@@ -68,10 +68,10 @@ package:
   platform: linux-64
   dependencies:
     libgcc: 15.2.0
-  url: https://conda.anaconda.org/conda-forge/linux-64/libgcc-ng-15.2.0-h69a702a_7.conda
+  url: https://conda.anaconda.org/conda-forge/linux-64/libgcc-ng-15.2.0-h69a702a_14.conda
   hash:
-    md5: 280ea6eee9e2ddefde25ff799c4f0363
-    sha256: 2045066dd8e6e58aaf5ae2b722fb6dfdbb57c862b5f34ac7bfb58c40ef39b6ad
+    md5: 6c13aaae36d7514f28bd5544da1a7bb8
+    sha256: 48a77fde940b4b877c0ed24efd562c135170a46d100c07cd2d7b67e842e30642
   category: main
   optional: false
 - name: libgomp
@@ -80,35 +80,35 @@ package:
   platform: linux-64
   dependencies:
     __glibc: '>=2.17,<3.0.a0'
-  url: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-h767d61c_7.conda
+  url: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_14.conda
   hash:
-    md5: f7b4d76975aac7e5d9e6ad13845f92fe
-    sha256: e9fb1c258c8e66ee278397b5822692527c5f5786d372fe7a869b900853f3f5ca
+    md5: 91349c276f84f590487e4c7f6e90e077
+    sha256: 2017cbc0f0f3b1d15df9ca681960eef015f9f58ba0d6e841694277a9f7eae0fc
   category: main
   optional: false
 - name: libpng
-  version: 1.6.34
+  version: 1.6.35
   manager: conda
   platform: linux-64
   dependencies:
-    libgcc-ng: '>=4.9'
+    libgcc-ng: '>=7.3.0'
     zlib: '>=1.2.11,<1.3.0a0'
-  url: https://conda.anaconda.org/conda-forge/linux-64/libpng-1.6.34-ha92aebf_2.tar.bz2
+  url: https://conda.anaconda.org/conda-forge/linux-64/libpng-1.6.35-h84994c4_1002.tar.bz2
   hash:
-    md5: 7811897894a932828537fb7063d4fe49
-    sha256: e21adb857f7507c691387e25cb60eeb6e81f4e69eeb4337ffe7a767fadcfb658
+    md5: c70c08c270398f7888ae6734d9c9966b
+    sha256: 6cc187e5832b7c6501c67d2ee4f08a52f81499f9699f75f2674042461db75659
   category: main
   optional: false
 - name: libpng
-  version: 1.6.34
+  version: 1.6.35
   manager: conda
   platform: osx-64
   dependencies:
     zlib: '>=1.2.11,<1.3.0a0'
-  url: https://conda.anaconda.org/conda-forge/osx-64/libpng-1.6.34-ha92aebf_2.tar.bz2
+  url: https://conda.anaconda.org/conda-forge/osx-64/libpng-1.6.35-ha441bb4_1002.tar.bz2
   hash:
-    md5: 3dddd33194f34adaffb6292910636c42
-    sha256: 877f3bf8bb55d4a779b62b99cde913bf8c092de4beee84eb204630cd45fded27
+    md5: 6c269145a4752348c3697102b2800e30
+    sha256: 13ef4ab5f8f5570f517774f9d8f9848e6f3bb933d016c9ee004822fdb9efaa0f
   category: main
   optional: false
 - name: libzlib
