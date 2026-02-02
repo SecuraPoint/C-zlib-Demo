@@ -12,4 +12,10 @@ ignored_patterns:
 scan_max_file_size:
 attribution_template:
 ignored_vulnerabilities:
+  - VCID-q4q6-yfng-aaag
+  - CVE-2024-27351
+  - GHSA-vm8q-m57g-pff3
+  - OSV-2020-871
+  - BIT-django-2024-24680
+  - PYSEC-2024-28
 ignored_dependency_scopes:
